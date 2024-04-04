@@ -1,0 +1,55 @@
+---
+- name: Setting up CA on Control Node
+  hosts: controlNode
+  become: yes
+  vars:
+    ca_cert_path: "/etc/ssl/certs/ca.crt"
+    ca_key_path: "/etc/ssl/private/ca.key"
+    openssl_config_file: "/etc/ssl/openssl.cnf"
+    ca_days: 3650
+  tasks:
+    - name: Installation of OpenSSL
+      package:
+        name: openssl
+        state: present
+
+    - name: Generate CA Private Key
+      openssl_privatekey:
+        path: "{{ ca_key_path }}"
+        size: 4096
+      register: ca_key
+
+    - name: Generate CA Certificate
+      openssl_csr:
+        path: /etc/ssl/certs/ca.csr
+        privatekey_path: "{{ ca_key_path }}"
+        common_name: "Certificate Authority"
+        country_name: "PH"
+        state_or_province_name: "Quezon City"
+        locality_name: "TIP"
+        organization_name: "Computer Engineering"
+        email_address: "qjbmamaculada@tip.edu.ph"
+      register: ca_csr
+
+    - name: Self Signed CA Certificate
+      openssl_certificate:
+        path: "{{ ca_cert_path }}"
+        privatekey_path: "{{ ca_key_path }}"
+        csr_path: /etc/ssl/certs/ca.csr
+        provider: selfsigned
+        force: true
+
+  handlers:
+    - name: Restart OpenSSL Service
+      service:
+        name: openssl
+        state: restarted
+
+
+- hosts: localhost
+  become: yes
+  tasks:
+    - name: Copy Certificate from Control Node to Manage Node
+      copy:
+        src: /etc/ssl/certs/ca-certificates.crt
+        dest: /home/jai/CPE243_HOA-9.1/certificate
